@@ -3,7 +3,7 @@ name = "chan-signal"
 version = "0.1.0"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = "Listen to OS signals with channels."
-documentation = "http://burntsushi.net/rustdoc/chan-signal/"
+documentation = "http://burntsushi.net/rustdoc/chan_signal/"
 homepage = "https://github.com/BurntSushi/chan-signal"
 repository = "https://github.com/BurntSushi/chan-signal"
 readme = "README.md"
@@ -12,6 +12,6 @@ license = "Unlicense/MIT"
 
 [dependencies]
 bit-set = "0.2.0"
-chan = { version = "0.1", path = "/home/andrew/rust/chan" }
+chan = "0.1"
 lazy_static = "0.1"
 libc = "0.1"
