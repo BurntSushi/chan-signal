@@ -1,0 +1,6 @@
+#!/bin/sh
+
+for t in ./examples/test_*.rs; do
+  filename=$(basename "$t")
+  cargo run --example ${filename%*.rs}
+done
