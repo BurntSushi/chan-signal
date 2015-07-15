@@ -62,13 +62,14 @@ fn main() {
     }
 }
 
-fn run(sdone: chan::Sender<()>) {
+fn run(_sdone: chan::Sender<()>) {
     println!("Running work for 5 seconds.");
     println!("Can you send a signal quickly enough?");
     // Do some work.
     ::std::thread::sleep_ms(5000);
-    // Quit normally.
-    sdone.send(());
+
+    // _sdone gets dropped which closes the channel and causes `rdone`
+    // to unblock.
 }
 ```
 

@@ -46,11 +46,13 @@ fn main() {
     }
 }
 
-fn run(sdone: chan::Sender<()>) {
+fn run(_sdone: chan::Sender<()>) {
     // Do some work.
     ::std::thread::sleep_ms(1000);
     // Quit normally.
-    sdone.send(());
+    // Note that we don't need to send any values. We just let the
+    // sending channel drop, which closes the channel, which causes
+    // the receiver to synchronize immediately and always.
 }
 ```
 

@@ -7,6 +7,8 @@
 // But with a channel based API, it's easy to integrate with the rest of
 // your control flow.
 
+#![allow(deprecated)] // for connect=>join in 1.3
+
 #[macro_use] extern crate chan;
 extern crate chan_signal;
 
