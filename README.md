@@ -72,6 +72,16 @@ fn run(sdone: chan::Sender<()>) {
 }
 ```
 
+This is much easier than registering a signal handler because:
+
+1. Signal handlers run asynchronously.
+2. The code you're permitted to execute in a signal handler is extremely
+   constrained (e.g., no allocation), so it is difficult to integrate
+   it with the rest of your program.
+
+Using channels, you can invent whatever flow you like and handle OS signals
+just like anything else.
+
 
 ### How it works
 
