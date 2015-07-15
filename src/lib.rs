@@ -1,9 +1,118 @@
+/*!
+This crate provides a simplistic interface to subscribe to operating system
+signals through a channel API. Use is extremely simple:
+
+```no_run
+use chan_signal::Signal;
+
+let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
+
+// Blocks until this process is sent an INT or TERM signal.
+// Since the channel is never closed, we can unwrap the received value.
+signal.recv().unwrap();
+```
+
+
+# Example
+
+When combined with `chan_select!` from the `chan` crate, one can easily
+integrate signals with the rest of your program. For example, consider a
+main function that waits for either normal completion of work (which is done
+in a separate thread) or for a signal to be delivered:
+
+```no_run
+#[macro_use]
+extern crate chan;
+extern crate chan_signal;
+
+use chan_signal::Signal;
+
+fn main() {
+    // Signal gets a value when the OS sent a INT or TERM signal.
+    let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
+    // When our work is complete, send a sentinel value on `sdone`.
+    let (sdone, rdone) = chan::sync(0);
+    // Run work.
+    ::std::thread::spawn(move || run(sdone));
+
+    // Wait for a signal or for work to be done.
+    chan_select! {
+        signal.recv() -> signal => {
+            println!("received signal: {:?}", signal)
+        },
+        rdone.recv() => {
+            println!("Program completed normally.");
+        }
+    }
+}
+
+fn run(sdone: chan::Sender<()>) {
+    // Do some work.
+    ::std::thread::sleep_ms(1000);
+    // Quit normally.
+    sdone.send(());
+}
+```
+
+You can see this example in action by running `cargo run --example select`
+in the root directory of this crate's
+[repository](https://github.com/BurntSushi/chan-signal).
+
+# Platform support (no Windows support)
+
+This should work on Unix platforms supported by Rust itself.
+
+There is no Windows support at all. I welcome others to either help me add it
+or help educate me so that I may one day add it.
+
+
+# How it works
+
+Overview: uses the "spawn a thread and block on `sigwait`" approach. In
+particular, it avoids standard asynchronous signal handling because it is
+very difficult to do anything non-trivial inside a signal handler.
+
+After the first call to `notify` (or `notify_on`), all signals defined in the
+`Signal` enum are set to *blocked*. This is necessary for synchronous signal
+handling using `sigwait`.
+
+After the signals are blocked, a new thread is spawned and immediately blocks
+on a call to `sigwait`. It is only unblocked when one of the signals in
+the `Signal` enum are sent to the process. Once it's unblocked, it sends the
+signal on all subscribed channels via a non-blocking send. Once all channels
+have been visited, the thread blocks on `sigwait` again.
+
+This approach has some restrictions. Namely, your program must comply with the
+following:
+
+* Any and all threads spawned in your program **must** come after the first
+  call to `notify` (or `notify_on`). This is so all spawned threads inherit
+  the blocked status of signals. If a thread starts before `notify` is called,
+  it will not have the correct signal mask. When a signal is delivered, the
+  result is indeterminate.
+* No other threads may call `sigwait`. When a signal is delivered, only one
+  `sigwait` is indeterminately unblocked.
+
+
+# Future work
+
+This crate exposes the simplest API I could think of. As a result, a few
+additions may be warranted:
+
+* Expand the set of signals. (Requires figuring out platform differences.)
+* Allow channel unsubscription.
+* Allow callers to reset the signal mask? (Seems hard.)
+* Support Windows.
+*/
+#![deny(missing_docs)]
+
 extern crate bit_set;
 #[macro_use] extern crate chan;
 #[macro_use] extern crate lazy_static;
 extern crate libc;
 
 use std::collections::HashMap;
+use std::io;
 use std::mem;
 use std::ptr;
 use std::sync::Mutex;
@@ -25,15 +134,54 @@ lazy_static! {
     };
 }
 
+/// Create a new channel subscribed to the given signals.
+///
+/// The channel returned is never closed.
+///
+/// This is a convenience function for subscribing to multiple signals at once.
+/// See the documentation of `notify_on` for details.
+///
+/// The channel returned has a small buffer to prevent signals from being
+/// dropped.
+///
+/// **THIS MUST BE CALLED BEFORE ANY OTHER THREADS ARE SPAWNED IN YOUR
+/// PROCESS.**
+///
+/// # Example
+///
+/// ```no_run
+/// use chan_signal::Signal;
+///
+/// let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
+///
+/// // Blocks until this process is sent an INT or TERM signal.
+/// // Since the channel is never closed, we can unwrap the received value.
+/// signal.recv().unwrap();
+/// ```
 pub fn notify(signals: &[Signal]) -> chan::Receiver<Signal> {
-    let (s, r) = chan::sync(1);
+    let (s, r) = chan::sync(100);
     for &sig in signals {
         notify_on(&s, sig);
     }
-    // dropping `s` is OK because `notify` acquires one.
+    // dropping `s` is OK because `notify_on` acquires one.
     r
 }
 
+/// Subscribe to a signal on a channel.
+///
+/// When `signal` is delivered to this process, it will be sent on the channel
+/// given.
+///
+/// Note that a signal is sent using a non-blocking send. Namely, if the
+/// channel's buffer is full (or it has no buffer) and it isn't ready to
+/// rendezvous, then the signal will be dropped.
+///
+/// There is currently no way to unsubscribe. Moreover, the channel given
+/// here will be alive for the lifetime of the process. Therefore, the channel
+/// will never be closed.
+///
+/// **THIS MUST BE CALLED BEFORE ANY OTHER THREADS ARE SPAWNED IN YOUR
+/// PROCESS.**
 pub fn notify_on(chan: &Sender<Signal>, signal: Signal) {
     let mut subs = HANDLERS.lock().unwrap();
     if subs.contains_key(chan) {
@@ -46,9 +194,9 @@ pub fn notify_on(chan: &Sender<Signal>, signal: Signal) {
 }
 
 fn init() {
-    SigSet::posix88().mask_thread().unwrap();
+    SigSet::subscribable().thread_block_signals().unwrap();
     thread::spawn(move || {
-        let mut listen = SigSet::posix88();
+        let mut listen = SigSet::subscribable();
         loop {
             let sig = listen.wait().unwrap();
             let subs = HANDLERS.lock().unwrap();
@@ -65,6 +213,7 @@ fn init() {
     });
 }
 
+/// Kill the current process. (Only used in tests.)
 #[doc(hidden)]
 pub fn kill_this(sig: Signal) {
     unsafe { kill(getpid(), sig.as_sig()); }
@@ -72,6 +221,11 @@ pub fn kill_this(sig: Signal) {
 
 type Sig = libc::c_int;
 
+/// The set of subscribable signals.
+///
+/// After the first call to `notify_on` (or `notify`), precisely this set of
+/// signals are set to blocked status.
+#[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Signal {
     HUP,
@@ -85,6 +239,8 @@ pub enum Signal {
     PIPE,
     ALRM,
     TERM,
+    #[doc(hidden)]
+    __NonExhaustiveMatch,
 }
 
 impl Signal {
@@ -118,10 +274,12 @@ impl Signal {
             Signal::PIPE => SIGPIPE,
             Signal::ALRM => SIGALRM,
             Signal::TERM => SIGTERM,
+            Signal::__NonExhaustiveMatch => unreachable!(),
         }
     }
 }
 
+/// Safe wrapper around sigset_t.
 struct SigSet(sigset_t);
 
 impl SigSet {
@@ -131,7 +289,9 @@ impl SigSet {
         SigSet(set)
     }
 
-    fn posix88() -> SigSet {
+    /// Creates a new signal set with precisely the signals we're limited
+    /// to subscribing to.
+    fn subscribable() -> SigSet {
         let mut set = SigSet::empty();
         set.add(SIGHUP).unwrap();
         set.add(SIGINT).unwrap();
@@ -147,51 +307,27 @@ impl SigSet {
         set
     }
 
-    fn add(&mut self, sig: Sig) -> Result<(), ()> {
-        if unsafe { sigaddset(&mut self.0, sig) } != 0 {
-            Err(())
-        } else {
-            Ok(())
-        }
+    fn add(&mut self, sig: Sig) -> io::Result<()> {
+        unsafe { ok_errno((), sigaddset(&mut self.0, sig)) }
     }
 
-    fn wait(&mut self) -> Result<Sig, ()> {
+    fn wait(&mut self) -> io::Result<Sig> {
         let mut sig: Sig = 0;
-        if unsafe { sigwait(&mut self.0, &mut sig) } != 0 {
-            Err(())
-        } else {
-            Ok(sig)
-        }
+        let errno = unsafe { sigwait(&mut self.0, &mut sig) };
+        ok_errno(sig, errno)
     }
 
-    fn mask_thread(&self) -> Result<(), ()> {
-        let err = unsafe {
+    fn thread_block_signals(&self) -> io::Result<()> {
+        let ecode = unsafe {
             pthread_sigmask(SIG_SETMASK, &self.0, ptr::null_mut())
         };
-        if err != 0 {
-            Err(())
-        } else {
-            Ok(())
-        }
+        ok_errno((), ecode)
     }
 }
 
-// Sizes are taken from: /usr/include/bits/sigset.h
-// namely: # define _SIGSET_NWORDS  (1024 / (8 * sizeof (unsigned long int)))
-#[repr(C)]
-#[cfg(target_pointer_width = "32")]
-struct sigset_t {
-    __val: [libc::c_ulong; 32],
+fn ok_errno<T>(ok: T, ecode: libc::c_int) -> io::Result<T> {
+    if ecode != 0 { Err(io::Error::from_raw_os_error(ecode)) } else { Ok(ok) }
 }
-
-#[repr(C)]
-#[cfg(target_pointer_width = "64")]
-struct sigset_t {
-    __val: [libc::c_ulong; 16],
-}
-
-// Taken from /usr/include/bits/sigaction.h
-const SIG_SETMASK: libc::c_int = 2;
 
 extern {
     fn sigwait(set: *mut sigset_t, sig: *mut Sig) -> Sig;
@@ -203,3 +339,53 @@ extern {
         oldset: *mut sigset_t,
     ) -> libc::c_int;
 }
+
+// Most of this was lifted out of rust-lang:rust/src/libstd/sys/unix/c.rs.
+
+#[cfg(all(any(target_os = "linux", target_os = "android"),
+          any(target_arch = "x86",
+              target_arch = "x86_64",
+              target_arch = "powerpc",
+              target_arch = "arm",
+              target_arch = "aarch64")))]
+const SIG_SETMASK: libc::c_int = 2;
+
+#[cfg(all(any(target_os = "linux", target_os = "android"),
+          any(target_arch = "mips", target_arch = "mipsel")))]
+const SIG_SETMASK: libc::c_int = 3;
+
+#[cfg(any(target_os = "macos",
+          target_os = "ios",
+          target_os = "freebsd",
+          target_os = "dragonfly",
+          target_os = "bitrig",
+          target_os = "netbsd",
+          target_os = "openbsd"))]
+const SIG_SETMASK: libc::c_int = 3;
+
+#[cfg(all(target_os = "linux", target_pointer_width = "32"))]
+#[repr(C)]
+struct sigset_t {
+    __val: [libc::c_ulong; 32],
+}
+
+#[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+#[repr(C)]
+struct sigset_t {
+    __val: [libc::c_ulong; 16],
+}
+
+#[cfg(target_os = "android")]
+type sigset_t = libc::c_ulong;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+type sigset_t = u32;
+
+#[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+#[repr(C)]
+struct sigset_t {
+    bits: [u32; 4],
+}
+
+#[cfg(any(target_os = "bitrig", target_os = "netbsd", target_os = "openbsd"))]
+type sigset_t = libc::c_uint;
