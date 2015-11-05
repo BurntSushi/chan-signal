@@ -122,12 +122,12 @@ use std::thread;
 
 use bit_set::BitSet;
 use chan::Sender;
-use libc::consts::os::posix88::{
+use libc::{
     SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL,
     SIGSEGV, SIGPIPE, SIGALRM, SIGTERM,
 };
-use libc::funcs::posix88::signal::kill;
-use libc::funcs::posix88::unistd::getpid;
+use libc::kill;
+use libc::getpid;
 
 lazy_static! {
     static ref HANDLERS: Mutex<HashMap<Sender<Signal>, BitSet>> = {
