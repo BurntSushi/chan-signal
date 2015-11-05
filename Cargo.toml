@@ -1,6 +1,6 @@
 [package]
 name = "chan-signal"
-version = "0.1.4"  #:version
+version = "0.1.5"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = "Listen to OS signals with channels."
 documentation = "http://burntsushi.net/rustdoc/chan_signal/"
