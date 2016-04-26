@@ -133,6 +133,8 @@ use libc::{
     // Common Extensions (SIGINFO and SIGEMT not in libc)
     SIGIO,
     SIGWINCH,
+
+    SIG_SETMASK,
 };
 use libc::kill;
 use libc::getpid;
@@ -423,27 +425,6 @@ extern {
 }
 
 // Most of this was lifted out of rust-lang:rust/src/libstd/sys/unix/c.rs.
-
-#[cfg(all(any(target_os = "linux", target_os = "android"),
-          any(target_arch = "x86",
-              target_arch = "x86_64",
-              target_arch = "powerpc",
-              target_arch = "arm",
-              target_arch = "aarch64")))]
-const SIG_SETMASK: libc::c_int = 2;
-
-#[cfg(all(any(target_os = "linux", target_os = "android"),
-          any(target_arch = "mips", target_arch = "mipsel")))]
-const SIG_SETMASK: libc::c_int = 3;
-
-#[cfg(any(target_os = "macos",
-          target_os = "ios",
-          target_os = "freebsd",
-          target_os = "dragonfly",
-          target_os = "bitrig",
-          target_os = "netbsd",
-          target_os = "openbsd"))]
-const SIG_SETMASK: libc::c_int = 3;
 
 #[cfg(all(target_os = "linux", target_pointer_width = "32"))]
 #[repr(C)]
