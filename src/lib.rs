@@ -124,7 +124,7 @@ use bit_set::BitSet;
 use chan::Sender;
 use libc::{
     SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL,
-    SIGSEGV, SIGPIPE, SIGALRM, SIGTERM,
+    SIGSEGV, SIGPIPE, SIGALRM, SIGTERM, SIGUSR1, SIGUSR2,
 };
 use libc::kill;
 use libc::getpid;
@@ -241,6 +241,8 @@ pub enum Signal {
     PIPE,
     ALRM,
     TERM,
+    USR1,
+    USR2,
     #[doc(hidden)]
     __NonExhaustiveMatch,
 }
@@ -259,6 +261,8 @@ impl Signal {
             SIGPIPE => Signal::PIPE,
             SIGALRM => Signal::ALRM,
             SIGTERM => Signal::TERM,
+            SIGUSR1 => Signal::USR1,
+            SIGUSR2 => Signal::USR2,
             sig => panic!("unsupported signal number: {}", sig),
         }
     }
@@ -276,6 +280,8 @@ impl Signal {
             Signal::PIPE => SIGPIPE,
             Signal::ALRM => SIGALRM,
             Signal::TERM => SIGTERM,
+            Signal::USR1 => SIGUSR1,
+            Signal::USR2 => SIGUSR2,
             Signal::__NonExhaustiveMatch => unreachable!(),
         }
     }
@@ -306,6 +312,8 @@ impl SigSet {
         set.add(SIGPIPE).unwrap();
         set.add(SIGALRM).unwrap();
         set.add(SIGTERM).unwrap();
+        set.add(SIGUSR1).unwrap();
+        set.add(SIGUSR2).unwrap();
         set
     }
 
