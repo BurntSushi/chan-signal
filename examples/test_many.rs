@@ -10,7 +10,7 @@ fn main() {
     chan_signal::notify_on(&s1, Signal::HUP);
     chan_signal::notify_on(&s2, Signal::TERM);
     kill_this(Signal::HUP);
-    kill_this(Signal::TERM);
     assert_eq!(r1.recv(), Some(Signal::HUP));
+    kill_this(Signal::TERM);
     assert_eq!(r2.recv(), Some(Signal::TERM));
 }
