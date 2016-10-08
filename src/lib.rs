@@ -123,8 +123,16 @@ use std::thread;
 use bit_set::BitSet;
 use chan::Sender;
 use libc::{
+    // POSIX.1-2008, minus SIGPOLL (not in some BSD, use SIGIO)
     SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL,
     SIGSEGV, SIGPIPE, SIGALRM, SIGTERM, SIGUSR1, SIGUSR2,
+    SIGCHLD, SIGCONT, SIGSTOP, SIGTSTP, SIGTTIN, SIGTTOU,
+    SIGBUS, SIGPROF, SIGSYS, SIGTRAP, SIGURG, SIGVTALRM,
+    SIGXCPU, SIGXFSZ,
+
+    // Common Extensions (SIGINFO and SIGEMT not in libc)
+    SIGIO,
+    SIGWINCH,
 };
 use libc::kill;
 use libc::getpid;
@@ -243,6 +251,22 @@ pub enum Signal {
     TERM,
     USR1,
     USR2,
+    CHLD,
+    CONT,
+    STOP,
+    TSTP,
+    TTIN,
+    TTOU,
+    BUS,
+    PROF,
+    SYS,
+    TRAP,
+    URG,
+    VTALRM,
+    XCPU,
+    XFSZ,
+    IO,
+    WINCH,
     #[doc(hidden)]
     __NonExhaustiveMatch,
 }
@@ -263,6 +287,22 @@ impl Signal {
             SIGTERM => Signal::TERM,
             SIGUSR1 => Signal::USR1,
             SIGUSR2 => Signal::USR2,
+            SIGCHLD => Signal::CHLD,
+            SIGCONT => Signal::CONT,
+            SIGSTOP => Signal::STOP,
+            SIGTSTP => Signal::TSTP,
+            SIGTTIN => Signal::TTIN,
+            SIGTTOU => Signal::TTOU,
+            SIGBUS => Signal::BUS,
+            SIGPROF => Signal::PROF,
+            SIGSYS => Signal::SYS,
+            SIGTRAP => Signal::TRAP,
+            SIGURG => Signal::URG,
+            SIGVTALRM => Signal::VTALRM,
+            SIGXCPU => Signal::XCPU,
+            SIGXFSZ => Signal::XFSZ,
+            SIGIO => Signal::IO,
+            SIGWINCH => Signal::WINCH,
             sig => panic!("unsupported signal number: {}", sig),
         }
     }
@@ -282,6 +322,22 @@ impl Signal {
             Signal::TERM => SIGTERM,
             Signal::USR1 => SIGUSR1,
             Signal::USR2 => SIGUSR2,
+            Signal::CHLD => SIGCHLD,
+            Signal::CONT => SIGCONT,
+            Signal::STOP => SIGSTOP,
+            Signal::TSTP => SIGTSTP,
+            Signal::TTIN => SIGTTIN,
+            Signal::TTOU => SIGTTOU,
+            Signal::BUS => SIGBUS,
+            Signal::PROF => SIGPROF,
+            Signal::SYS => SIGSYS,
+            Signal::TRAP => SIGTRAP,
+            Signal::URG => SIGURG,
+            Signal::VTALRM => SIGVTALRM,
+            Signal::XCPU => SIGXCPU,
+            Signal::XFSZ => SIGXFSZ,
+            Signal::IO => SIGIO,
+            Signal::WINCH => SIGWINCH,
             Signal::__NonExhaustiveMatch => unreachable!(),
         }
     }
@@ -314,6 +370,22 @@ impl SigSet {
         set.add(SIGTERM).unwrap();
         set.add(SIGUSR1).unwrap();
         set.add(SIGUSR2).unwrap();
+        set.add(SIGCHLD).unwrap();
+        set.add(SIGCONT).unwrap();
+        set.add(SIGSTOP).unwrap();
+        set.add(SIGTSTP).unwrap();
+        set.add(SIGTTIN).unwrap();
+        set.add(SIGTTOU).unwrap();
+        set.add(SIGBUS).unwrap();
+        set.add(SIGPROF).unwrap();
+        set.add(SIGSYS).unwrap();
+        set.add(SIGTRAP).unwrap();
+        set.add(SIGURG).unwrap();
+        set.add(SIGVTALRM,).unwrap();
+        set.add(SIGXCPU).unwrap();
+        set.add(SIGXFSZ).unwrap();
+        set.add(SIGIO).unwrap();
+        set.add(SIGWINCH).unwrap();
         set
     }
 
