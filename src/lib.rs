@@ -213,7 +213,7 @@ fn init() {
             let sig = listen.wait().unwrap();
             let subs = HANDLERS.lock().unwrap();
             for (s, sigs) in subs.iter() {
-                if !sigs.contains(&(sig as usize)) {
+                if !sigs.contains(sig as usize) {
                     continue;
                 }
                 chan_select! {
