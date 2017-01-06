@@ -345,7 +345,7 @@ impl Signal {
     }
 }
 
-/// Safe wrapper around sigset_t.
+/// Safe wrapper around `sigset_t`.
 struct SigSet(sigset_t);
 
 impl SigSet {
