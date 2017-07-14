@@ -135,6 +135,7 @@ use libc::{
     SIGWINCH,
 
     SIG_SETMASK,
+    SIG_BLOCK,
 };
 use libc::kill;
 use libc::getpid;
@@ -202,11 +203,38 @@ pub fn notify_on(chan: &Sender<Signal>, signal: Signal) {
         let mut sigs = BitSet::new();
         sigs.insert(signal.as_sig() as usize);
         subs.insert((*chan).clone(), sigs);
+
+        // Make sure that the signal that we want notifications on is blocked
+        let mut sig_set = SigSet::empty();
+        sig_set.add(signal.as_sig()).unwrap();
+        sig_set.thread_block_signals().unwrap();
     }
 }
 
+/// Unblock all subscribable signals that are blocked by default.
+///
+/// As noted elsewhere, by default chan_signal blocks all subscribable signals and enables
+/// notification upon arrival of particular signals using `notify`/`notify_on`.
+/// Calling this function will change the default behavior and cause only the signals that are
+/// passed to `notify`/`notify_on` to be blocked.
+///
+/// This CANNOT be called after any call to `notify`/`notify_on` and (as with `notify`/`notify_on`)
+/// a call to this function has to be made before spawning other threads.
+pub fn unblock_signals_by_default() {
+    {
+        let subs = HANDLERS.lock().unwrap();
+        if !subs.is_empty() {
+            panic!("Called unblock_signals_by_default after setting up notifications.");
+        }
+    }
+
+    SigSet::empty().thread_set_signal_mask().unwrap();
+}
+
 fn init() {
-    SigSet::subscribable().thread_block_signals().unwrap();
+    // Block all subscribable signals by default
+    // This can be undone by calling unblock_signals_by_default
+    SigSet::subscribable().thread_set_signal_mask().unwrap();
     thread::spawn(move || {
         let mut listen = SigSet::subscribable();
         loop {
@@ -401,9 +429,16 @@ impl SigSet {
         ok_errno(sig, errno)
     }
 
-    fn thread_block_signals(&self) -> io::Result<()> {
+    fn thread_set_signal_mask(&self) -> io::Result<()> {
         let ecode = unsafe {
             pthread_sigmask(SIG_SETMASK, &self.0, ptr::null_mut())
+        };
+        ok_errno((), ecode)
+    }
+
+    fn thread_block_signals(&self) -> io::Result<()> {
+        let ecode = unsafe {
+            pthread_sigmask(SIG_BLOCK, &self.0, ptr::null_mut())
         };
         ok_errno((), ecode)
     }
