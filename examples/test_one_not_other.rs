@@ -3,9 +3,10 @@
 extern crate chan;
 extern crate chan_signal;
 
-use chan_signal::{Signal, kill_this};
+use chan_signal::{Signal, kill_this, block};
 
 fn main() {
+    block(&[Signal::TERM]);
     let (s, r) = chan::sync(1);
     chan_signal::notify_on(&s, Signal::HUP);
     kill_this(Signal::TERM);

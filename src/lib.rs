@@ -74,13 +74,14 @@ Overview: uses the "spawn a thread and block on `sigwait`" approach. In
 particular, it avoids standard asynchronous signal handling because it is
 very difficult to do anything non-trivial inside a signal handler.
 
-After the first call to `notify` (or `notify_on`), all signals defined in the
-`Signal` enum are set to *blocked*. This is necessary for synchronous signal
-handling using `sigwait`.
+After a call to `notify`/`notify_on` (or `block`), the given signals are set
+to *blocked*. This is necessary for synchronous signal handling using `sigwait`.
 
-After the signals are blocked, a new thread is spawned and immediately blocks
-on a call to `sigwait`. It is only unblocked when one of the signals in
-the `Signal` enum are sent to the process. Once it's unblocked, it sends the
+After the first call to `notify` (or `notify_on'), a new thread is spawned and
+immediately blocks on a call to `sigwait`. It is only unblocked when one of the
+signals that were masked previously by calls to `notify` etc. arrives, which now
+cannot be delivered directly to any of the threads of the process, and therefore
+unblocks the waiting signal watcher thread. Once it's unblocked, it sends the
 signal on all subscribed channels via a non-blocking send. Once all channels
 have been visited, the thread blocks on `sigwait` again.
 
@@ -134,8 +135,8 @@ use libc::{
     SIGIO,
     SIGWINCH,
 
-    SIG_SETMASK,
     SIG_BLOCK,
+    SIG_SETMASK,
 };
 use libc::kill;
 use libc::getpid;
@@ -206,38 +207,49 @@ pub fn notify_on(chan: &Sender<Signal>, signal: Signal) {
     }
 
     // Make sure that the signal that we want notifications on is blocked
-    // It does not matter if we unblock the same signal twice.
-    let mut sig_set = SigSet::empty();
-    sig_set.add(signal.as_sig()).unwrap();
-    sig_set.thread_block_signals().unwrap();
+    // It does not matter if we block the same signal twice.
+    block(&[signal]);
 }
 
-/// Unblock all subscribable signals that are blocked by default.
+/// Block all given signals without receiving notifications.
 ///
-/// As noted elsewhere, by default chan_signal blocks all subscribable signals and enables
-/// notification upon arrival of particular signals using `notify`/`notify_on`.
-/// Calling this function will change the default behavior and cause only the signals that are
-/// passed to `notify`/`notify_on` to be blocked.
+/// If a signal has also been passed to `notify`/`notify_on` this function
+/// does not have any effect in terms of that signal.
 ///
-/// This CANNOT be called after any call to `notify`/`notify_on` and (as with `notify`/`notify_on`)
-/// a call to this function has to be made before spawning other threads.
-pub fn unblock_signals_by_default() {
-    {
-        let subs = HANDLERS.lock().unwrap();
-        if !subs.is_empty() {
-            panic!("Called unblock_signals_by_default after setting up notifications.");
-        }
+/// **THIS MUST BE CALLED BEFORE ANY OTHER THREADS ARE SPAWNED IN YOUR
+/// PROCESS.**
+pub fn block(signals: &[Signal]) {
+    let mut block = SigSet::empty();
+    for signal in signals {
+        block.add(signal.as_sig()).unwrap();
     }
+    block.thread_block_signals().unwrap();
+}
 
-    SigSet::empty().thread_set_signal_mask().unwrap();
+/// Block all subscribable signals.
+///
+/// Calling this function effectively restores the default behavior of
+/// version <= 0.2.0 of this library.
+///
+/// **THIS MUST BE CALLED BEFORE ANY OTHER THREADS ARE SPAWNED IN YOUR
+/// PROCESS.**
+pub fn block_all_subscribable() {
+    SigSet::subscribable().thread_block_signals().unwrap();
 }
 
 fn init() {
-    // Block all subscribable signals by default
-    // This can be undone by calling unblock_signals_by_default
+    // First:
+    // Get the curren thread_mask. (We cannot just overwrite the threadmask with
+    // an empty one because this function is executed lazily.
+    let saved_mask = SigSet::current().unwrap();
+
+    // Then:
+    // Block all signals in this thread. The signal mask will then be inherited
+    // by the worker thread.
     SigSet::subscribable().thread_set_signal_mask().unwrap();
     thread::spawn(move || {
         let mut listen = SigSet::subscribable();
+
         loop {
             let sig = listen.wait().unwrap();
             let subs = HANDLERS.lock().unwrap();
@@ -252,6 +264,14 @@ fn init() {
             }
         }
     });
+
+    // Now:
+    // Reset to the previously saved sigmask.
+    // This whole procedure is necessary, as we cannot rely on the worker thread
+    // starting fast enough to set its signal mask. Otherwise an early SIGTERM or
+    // similar may take down the process even though the main thread has blocked
+    // the signal.
+    saved_mask.thread_set_signal_mask().unwrap();
 }
 
 /// Kill the current process. (Only used in tests.)
@@ -384,6 +404,14 @@ impl SigSet {
         SigSet(set)
     }
 
+    fn current() -> io::Result<SigSet> {
+        let mut set = unsafe { mem::uninitialized() };
+        let ecode = unsafe {
+            pthread_sigmask(SIG_SETMASK, ptr::null_mut(), &mut set)
+        };
+        ok_errno(SigSet(set), ecode)
+    }
+
     /// Creates a new signal set with precisely the signals we're limited
     /// to subscribing to.
     fn subscribable() -> SigSet {
@@ -430,16 +458,16 @@ impl SigSet {
         ok_errno(sig, errno)
     }
 
-    fn thread_set_signal_mask(&self) -> io::Result<()> {
+    fn thread_block_signals(&self) -> io::Result<()> {
         let ecode = unsafe {
-            pthread_sigmask(SIG_SETMASK, &self.0, ptr::null_mut())
+            pthread_sigmask(SIG_BLOCK, &self.0, ptr::null_mut())
         };
         ok_errno((), ecode)
     }
 
-    fn thread_block_signals(&self) -> io::Result<()> {
+    fn thread_set_signal_mask(&self) -> io::Result<()> {
         let ecode = unsafe {
-            pthread_sigmask(SIG_BLOCK, &self.0, ptr::null_mut())
+            pthread_sigmask(SIG_SETMASK, &self.0, ptr::null_mut())
         };
         ok_errno((), ecode)
     }
