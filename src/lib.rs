@@ -203,12 +203,13 @@ pub fn notify_on(chan: &Sender<Signal>, signal: Signal) {
         let mut sigs = BitSet::new();
         sigs.insert(signal.as_sig() as usize);
         subs.insert((*chan).clone(), sigs);
-
-        // Make sure that the signal that we want notifications on is blocked
-        let mut sig_set = SigSet::empty();
-        sig_set.add(signal.as_sig()).unwrap();
-        sig_set.thread_block_signals().unwrap();
     }
+
+    // Make sure that the signal that we want notifications on is blocked
+    // It does not matter if we unblock the same signal twice.
+    let mut sig_set = SigSet::empty();
+    sig_set.add(signal.as_sig()).unwrap();
+    sig_set.thread_block_signals().unwrap();
 }
 
 /// Unblock all subscribable signals that are blocked by default.
