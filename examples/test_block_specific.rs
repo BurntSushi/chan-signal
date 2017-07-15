@@ -5,7 +5,6 @@ extern crate chan_signal;
 use chan_signal::{Signal, kill_this};
 
 fn main() {
-    chan_signal::unblock_signals_by_default();
     let r_usr1 = chan_signal::notify(&[Signal::USR1, Signal::ALRM]);
     kill_this(Signal::USR1);
     kill_this(Signal::ALRM);
