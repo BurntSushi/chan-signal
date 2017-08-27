@@ -10,7 +10,7 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
 ### Documentation
 
-[http://burntsushi.net/rustdoc/chan_signal/](http://burntsushi.net/rustdoc/chan_signal/).
+https://docs.rs/chan-signal
 
 
 ### Example
