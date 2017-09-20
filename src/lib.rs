@@ -77,7 +77,7 @@ very difficult to do anything non-trivial inside a signal handler.
 After a call to `notify`/`notify_on` (or `block`), the given signals are set
 to *blocked*. This is necessary for synchronous signal handling using `sigwait`.
 
-After the first call to `notify` (or `notify_on'), a new thread is spawned and
+After the first call to `notify` (or `notify_on`), a new thread is spawned and
 immediately blocks on a call to `sigwait`. It is only unblocked when one of the
 signals that were masked previously by calls to `notify` etc. arrives, which now
 cannot be delivered directly to any of the threads of the process, and therefore
