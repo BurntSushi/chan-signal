@@ -92,4 +92,4 @@ just like anything else.
 TL;DR - Spawn a thread, block on `sigwait`, deliver signals, repeat.
 
 It's
-[explained a bit more in the docs](http://burntsushi.net/rustdoc/chan_signal/#how-it-works).
+[explained a bit more in the docs](https://docs.rs/chan-signal/#how-it-works).
