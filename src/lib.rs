@@ -110,9 +110,18 @@ additions may be warranted:
 #![deny(missing_docs)]
 
 extern crate bit_set;
-#[macro_use] extern crate chan;
 #[macro_use] extern crate lazy_static;
 extern crate libc;
+
+#[cfg(not(feature = "crossbeam-channel"))]
+#[macro_use] extern crate chan as channel;
+#[cfg(not(feature = "crossbeam-channel"))]
+use channel::{Sender, sync as sync_channel};
+
+#[cfg(feature = "crossbeam-channel")]
+extern crate crossbeam_channel as channel;
+#[cfg(feature = "crossbeam-channel")]
+use channel::{Sender, bounded as sync_channel};
 
 use std::collections::HashMap;
 use std::io;
@@ -122,7 +131,6 @@ use std::sync::Mutex;
 use std::thread;
 
 use bit_set::BitSet;
-use chan::Sender;
 use libc::{
     // POSIX.1-2008, minus SIGPOLL (not in some BSD, use SIGIO)
     SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL,
@@ -172,8 +180,8 @@ lazy_static! {
 /// // Since the channel is never closed, we can unwrap the received value.
 /// signal.recv().unwrap();
 /// ```
-pub fn notify(signals: &[Signal]) -> chan::Receiver<Signal> {
-    let (s, r) = chan::sync(100);
+pub fn notify(signals: &[Signal]) -> channel::Receiver<Signal> {
+    let (s, r) = sync_channel(100);
     for &sig in signals {
         notify_on(&s, sig);
     }
@@ -257,10 +265,13 @@ fn init() {
                 if !sigs.contains(sig as usize) {
                     continue;
                 }
+                #[cfg(not(feature = "crossbeam-channel"))]
                 chan_select! {
                     default => {},
                     s.send(Signal::new(sig)) => {},
                 }
+                #[cfg(feature = "crossbeam-channel")]
+                let _ = s.try_send(Signal::new(sig));
             }
         }
     });
