@@ -110,7 +110,7 @@ additions may be warranted:
 #![deny(missing_docs)]
 
 extern crate bit_set;
-extern crate chan;
+#[allow(unused_imports)] #[macro_use] extern crate chan;
 #[macro_use] extern crate lazy_static;
 extern crate libc;
 
