@@ -118,6 +118,8 @@ extern crate libc;
 mod unix;
 #[cfg(unix)]
 use unix::*;
+#[cfg(unix)]
+pub use unix::kill_this;
 
 #[cfg(windows)]
 mod windows;

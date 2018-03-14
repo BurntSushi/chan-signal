@@ -1,5 +1,3 @@
-#[macro_use] extern crate chan;
-
 use libc;
 use libc::{
     // POSIX.1-2008, minus SIGPOLL (not in some BSD, use SIGIO)
@@ -102,6 +100,12 @@ fn init() {
     // similar may take down the process even though the main thread has blocked
     // the signal.
     saved_mask.thread_set_signal_mask().unwrap();
+}
+
+/// Kill the current process. (Only used in tests.)
+#[doc(hidden)]
+pub fn kill_this(sig: Signal) {
+    unsafe { kill(getpid(), sig.as_sig()); }
 }
 
 type Sig = libc::c_int;
