@@ -1,3 +1,4 @@
+extern crate chan;
 extern crate kernel32;
 extern crate winapi;
 
@@ -5,7 +6,6 @@ use std::collections::{HashSet, HashMap};
 use std::io;
 use std::sync::Mutex;
 
-use bit_set::BitSet;
 use chan::Sender;
 
 use self::winapi::shared::minwindef::{BOOL, DWORD, FALSE, TRUE};

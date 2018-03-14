@@ -1,3 +1,5 @@
+#[macro_use] extern crate chan;
+
 use libc;
 use libc::{
     // POSIX.1-2008, minus SIGPOLL (not in some BSD, use SIGIO)
