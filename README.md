@@ -1,5 +1,5 @@
 This crate provies experimental support for responding to OS signals using
-[channels](https://github.com/BurntSushi/chan). Currently, this only works on
+[channels](https://github.com/crossbeam-rs/crossbeam-channel). Currently, this only works on
 Unix based systems, but I'd appreciate help adding Windows support.
 
 [![Build status](https://api.travis-ci.org/BurntSushi/chan-signal.png)](https://travis-ci.org/BurntSushi/chan-signal)
@@ -31,14 +31,14 @@ signal.recv().unwrap();
 
 ### A realer example
 
-When combined with `chan_select!` from the `chan` crate, one can easily
+When combined with `select!` from the `crossbeam-channel` crate, one can easily
 integrate signals with the rest of your program. For example, consider a
 main function that waits for either normal completion of work (which is done
 in a separate thread) or for a signal to be delivered:
 
 ```rust
 #[macro_use]
-extern crate chan;
+extern crate crossbeam_channel;
 extern crate chan_signal;
 
 use std::thread;
@@ -50,22 +50,22 @@ fn main() {
     // Signal gets a value when the OS sent a INT or TERM signal.
     let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
     // When our work is complete, send a sentinel value on `sdone`.
-    let (sdone, rdone) = chan::sync(0);
+    let (sdone, rdone) = crossbeam_channel::bounded(0);
     // Run work.
     thread::spawn(move || run(sdone));
 
     // Wait for a signal or for work to be done.
-    chan_select! {
-        signal.recv() -> signal => {
+    select! {
+        recv(signal, signal) => {
             println!("received signal: {:?}", signal)
         },
-        rdone.recv() => {
+        recv(rdone) => {
             println!("Program completed normally.");
         }
     }
 }
 
-fn run(_sdone: chan::Sender<()>) {
+fn run(_sdone: crossbeam_channel::Sender<()>) {
     println!("Running work for 5 seconds.");
     println!("Can you send a signal quickly enough?");
     // Do some work.

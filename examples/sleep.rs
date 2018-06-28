@@ -1,4 +1,3 @@
-#[macro_use] extern crate chan;
 extern crate chan_signal;
 
 use std::thread;

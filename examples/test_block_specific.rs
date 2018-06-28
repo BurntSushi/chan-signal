@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate chan;
+extern crate crossbeam_channel;
 extern crate chan_signal;
 
 use chan_signal::{Signal, kill_this};
@@ -11,7 +10,7 @@ fn main() {
     assert_eq!(r_usr1.recv(), Some(Signal::USR1));
     assert_eq!(r_usr1.recv(), Some(Signal::ALRM));
 
-    let (s, r_usr2) = chan::sync(1);
+    let (s, r_usr2) = crossbeam_channel::bounded(1);
     chan_signal::notify_on(&s, Signal::USR2);
     kill_this(Signal::USR2);
     assert_eq!(r_usr2.recv(), Some(Signal::USR2));

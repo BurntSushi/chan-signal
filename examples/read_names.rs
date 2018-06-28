@@ -9,7 +9,7 @@
 
 #![allow(deprecated)] // for connect=>join in 1.3
 
-#[macro_use] extern crate chan;
+#[macro_use] extern crate crossbeam_channel;
 extern crate chan_signal;
 
 use std::error::Error;
@@ -42,13 +42,13 @@ fn main() {
 
 type Result<T> = ::std::result::Result<T, Box<Error+Send+Sync>>;
 
-fn run(signal: chan::Receiver<Signal>) -> Result<Vec<String>> {
+fn run(signal: crossbeam_channel::Receiver<Signal>) -> Result<Vec<String>> {
     let lines = read_stdin_lines();
     let mut names = vec![];
     println!("Please enter some names, each on a new line:");
     loop {
-        chan_select! {
-            lines.recv() -> line => {
+        select! {
+            recv(lines, line) => {
                 match line {
                     // If the channel closed (i.e., reads EOF), then quit
                     // the loop and print what we've got.
@@ -60,7 +60,7 @@ fn run(signal: chan::Receiver<Signal>) -> Result<Vec<String>> {
             },
             // If we get SIGINT or SIGTERM, just stop the loop and print
             // what we've got so far.
-            signal.recv() => break,
+            recv(signal) => break,
         }
     }
     Ok(names)
@@ -68,8 +68,8 @@ fn run(signal: chan::Receiver<Signal>) -> Result<Vec<String>> {
 
 // Spawns a new thread to read lines and sends the result on the returned
 // channel.
-fn read_stdin_lines() -> chan::Receiver<io::Result<String>> {
-    let (s, r) = chan::sync(0);
+fn read_stdin_lines() -> crossbeam_channel::Receiver<io::Result<String>> {
+    let (s, r) = crossbeam_channel::bounded(0);
     let stdin = io::stdin();
     thread::spawn(move || {
         let stdin = stdin.lock();
