@@ -15,14 +15,14 @@ signal.recv().unwrap();
 
 # Example
 
-When combined with `chan_select!` from the `chan` crate, one can easily
+When combined with `select!` from the `crossbeam-channel` crate, one can easily
 integrate signals with the rest of your program. For example, consider a
 main function that waits for either normal completion of work (which is done
 in a separate thread) or for a signal to be delivered:
 
 ```no_run
 #[macro_use]
-extern crate chan;
+extern crate crossbeam_channel;
 extern crate chan_signal;
 
 use chan_signal::Signal;
@@ -31,22 +31,22 @@ fn main() {
     // Signal gets a value when the OS sent a INT or TERM signal.
     let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
     // When our work is complete, send a sentinel value on `sdone`.
-    let (sdone, rdone) = chan::sync(0);
+    let (sdone, rdone) = crossbeam_channel::bounded(0);
     // Run work.
     ::std::thread::spawn(move || run(sdone));
 
     // Wait for a signal or for work to be done.
-    chan_select! {
-        signal.recv() -> signal => {
+    select! {
+        recv(signal, signal) => {
             println!("received signal: {:?}", signal)
         },
-        rdone.recv() => {
+        recv(rdone) => {
             println!("Program completed normally.");
         }
     }
 }
 
-fn run(_sdone: chan::Sender<()>) {
+fn run(_sdone: crossbeam_channel::Sender<()>) {
     // Do some work.
     ::std::thread::sleep_ms(1000);
     // Quit normally.
@@ -110,7 +110,7 @@ additions may be warranted:
 #![deny(missing_docs)]
 
 extern crate bit_set;
-#[macro_use] extern crate chan;
+#[macro_use] extern crate crossbeam_channel;
 #[macro_use] extern crate lazy_static;
 extern crate libc;
 
@@ -122,7 +122,7 @@ use std::sync::Mutex;
 use std::thread;
 
 use bit_set::BitSet;
-use chan::Sender;
+use crossbeam_channel::Sender;
 use libc::{
     // POSIX.1-2008, minus SIGPOLL (not in some BSD, use SIGIO)
     SIGHUP, SIGINT, SIGQUIT, SIGILL, SIGABRT, SIGFPE, SIGKILL,
@@ -172,8 +172,8 @@ lazy_static! {
 /// // Since the channel is never closed, we can unwrap the received value.
 /// signal.recv().unwrap();
 /// ```
-pub fn notify(signals: &[Signal]) -> chan::Receiver<Signal> {
-    let (s, r) = chan::sync(100);
+pub fn notify(signals: &[Signal]) -> crossbeam_channel::Receiver<Signal> {
+    let (s, r) = crossbeam_channel::bounded(100);
     for &sig in signals {
         notify_on(&s, sig);
     }
@@ -257,9 +257,9 @@ fn init() {
                 if !sigs.contains(sig as usize) {
                     continue;
                 }
-                chan_select! {
+                select! {
+                    send(s, Signal::new(sig)) => {},
                     default => {},
-                    s.send(Signal::new(sig)) => {},
                 }
             }
         }

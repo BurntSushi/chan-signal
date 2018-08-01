@@ -2,7 +2,6 @@
 // OS signals. Namely, it requests to be notified about a SIGINT (usually
 // ^C in your terminal) and blocks until it gets one.
 
-#[macro_use] extern crate chan;
 extern crate chan_signal;
 
 use chan_signal::{Signal, notify};

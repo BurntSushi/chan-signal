@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate chan;
+extern crate crossbeam_channel;
 extern crate chan_signal;
 
 use std::thread;
@@ -11,22 +11,22 @@ fn main() {
     // Signal gets a value when the OS sent a INT or TERM signal.
     let signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
     // When our work is complete, send a sentinel value on `sdone`.
-    let (sdone, rdone) = chan::sync(0);
+    let (sdone, rdone) = crossbeam_channel::bounded(0);
     // Run work.
     thread::spawn(move || run(sdone));
 
     // Wait for a signal or for work to be done.
-    chan_select! {
-        signal.recv() -> signal => {
+    select! {
+        recv(signal, signal) => {
             println!("received signal: {:?}", signal)
         },
-        rdone.recv() => {
+        recv(rdone) => {
             println!("Program completed normally.");
         }
     }
 }
 
-fn run(_sdone: chan::Sender<()>) {
+fn run(_sdone: crossbeam_channel::Sender<()>) {
     println!("Running work for 5 seconds.");
     println!("Can you send a signal quickly enough?");
     // Do some work.
