@@ -13,5 +13,7 @@ license = "Unlicense/MIT"
 [dependencies]
 bit-set = "0.4"
 chan = "0.1"
+kernel32-sys = "0.2.1"
 lazy_static = "0.2"
 libc = "0.2"
+winapi = "0.3.4"
