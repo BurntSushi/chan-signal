@@ -2,7 +2,7 @@
 name = "chan-signal"
 version = "0.3.1"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
-description = "Listen to OS signals with channels."
+description = "DEPRECATED. Use crossbeam-channel and signal-hook instead."
 documentation = "https://docs.rs/chan-signal"
 homepage = "https://github.com/BurntSushi/chan-signal"
 repository = "https://github.com/BurntSushi/chan-signal"

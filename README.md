@@ -1,3 +1,39 @@
+## **This crate has reached its end-of-life and is now deprecated.**
+
+The intended successor of the `chan` crate is the
+[`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam-channel)
+crate. Its API is strikingly similar, but comes with a much better `select!`
+macro, better performance, a better test suite and an all-around better
+implementation.
+
+If you were previously using this crate for signal handling, then it is
+simple to reproduce a similar API with `crossbeam-channel` and the
+[`signal-hook`](https://github.com/vorner/signal-hook)
+crate. For example, here's `chan-signal`'s `notify` function:
+
+```rust
+extern crate crossbeam_channel as channel;
+extern crate signal_hook;
+
+fn notify(signals: &[c_int]) -> Result<channel::Receiver<c_int>> {
+    let (s, r) = channel::bounded(100);
+    let signals = signal_hook::iterator::Signals::new(signals)?;
+    thread::spawn(move || {
+        for signal in signals.forever() {
+            s.send(signal);
+        }
+    });
+    Ok(r)
+}
+```
+
+This crate may continue to receives bug fixes, but should otherwise be
+considered dead.
+
+
+chan-signal
+===========
+
 This crate provies experimental support for responding to OS signals using
 [channels](https://github.com/BurntSushi/chan). Currently, this only works on
 Unix based systems, but I'd appreciate help adding Windows support.
