@@ -27,7 +27,7 @@ fn notify(signals: &[c_int]) -> Result<channel::Receiver<c_int>> {
 }
 ```
 
-This crate may continue to receives bug fixes, but should otherwise be
+This crate may continue to receive bug fixes, but should otherwise be
 considered dead.
 
 
