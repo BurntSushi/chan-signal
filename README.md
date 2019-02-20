@@ -20,7 +20,9 @@ fn notify(signals: &[c_int]) -> Result<channel::Receiver<c_int>> {
     let signals = signal_hook::iterator::Signals::new(signals)?;
     thread::spawn(move || {
         for signal in signals.forever() {
-            s.send(signal);
+            if s.send(signal).is_err() {
+                break;
+            }
         }
     });
     Ok(r)
