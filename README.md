@@ -1,7 +1,7 @@
 ## **This crate has reached its end-of-life and is now deprecated.**
 
 The intended successor of the `chan` crate is the
-[`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam-channel)
+[`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam/tree/master/crossbeam-channel)
 crate. Its API is strikingly similar, but comes with a much better `select!`
 macro, better performance, a better test suite and an all-around better
 implementation.
@@ -20,7 +20,9 @@ fn notify(signals: &[c_int]) -> Result<channel::Receiver<c_int>> {
     let signals = signal_hook::iterator::Signals::new(signals)?;
     thread::spawn(move || {
         for signal in signals.forever() {
-            s.send(signal);
+            if s.send(signal).is_err() {
+                break;
+            }
         }
     });
     Ok(r)
