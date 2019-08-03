@@ -399,13 +399,13 @@ struct SigSet(sigset_t);
 
 impl SigSet {
     fn empty() -> SigSet {
-        let mut set = unsafe { mem::uninitialized() };
+        let mut set = unsafe { mem::zeroed() };
         unsafe { sigemptyset(&mut set) };
         SigSet(set)
     }
 
     fn current() -> io::Result<SigSet> {
-        let mut set = unsafe { mem::uninitialized() };
+        let mut set = unsafe { mem::zeroed() };
         let ecode = unsafe {
             pthread_sigmask(SIG_SETMASK, ptr::null_mut(), &mut set)
         };
