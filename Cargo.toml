@@ -1,6 +1,6 @@
 [package]
 name = "chan-signal"
-version = "0.3.2"  #:version
+version = "0.3.3"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = "DEPRECATED. Use crossbeam-channel and signal-hook instead."
 documentation = "https://docs.rs/chan-signal"
